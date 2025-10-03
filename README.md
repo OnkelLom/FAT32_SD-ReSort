@@ -22,11 +22,11 @@ This PowerShell script performs a FAT/FAT32-style re-sorting of folders and file
 ## Installation
 1. Clone or download this repository:
    ```bash
-   git clone https://github.com/<your-username>/<your-repo>.git
+   git clone https://github.com/OnkelLom/FAT32_SD-ReSort.git
    ```
 2. Navigate to the script directory:
    ```powershell
-   cd <your-repo>
+   cd FAT32_SD-ReSort
    ```
 Or simply download the latest Release at https://github.com/OnkelLom/FAT32_SD-ReSort/releases/latest
 
