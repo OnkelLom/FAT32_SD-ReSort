@@ -1,20 +1,18 @@
 <#
 .SYNOPSIS
-    Unified Script: Test Structure Creation & FAT32 ReSort
+    FAT32 SD-ReSort Script
 
 .DESCRIPTION
     Creates a test folder structure (optional) with Normal, ReadOnly, Hidden attributes,
-    and performs a FAT32-style re-sorting of folders and files.
+    and performs a FAT/FAT32-style re-sorting of folders and files. This is especially useful for SD cards
+    that use FAT/FAT32 file systems, which have specific sorting behaviors. FlashCarts like the EverDrive GB x7 or EverDrive N8 can't
+    sort files/folders by themselves, so this script helps to achieve the desired order.
 
 .PARAMETER Path
-    Root path for test structure and sorting. Defaults to TestStructure in script folder for testmode,
-    otherwise script folder if not specified.
+    Root path for test structure and sorting. Defaults to script folder if not specified.
 
 .PARAMETER SortBy
     Sorting criteria: Name | CreationTime | LastWriteTime | Length
-
-.PARAMETER testmode
-    If true, creates test folder structure and performs sorting test.
 
 .PARAMETER DryRun
     If true, only simulates moves and folder creation/removal.
@@ -22,14 +20,6 @@
 .PARAMETER HandleReadOnlyHidden
     Temporarily removes ReadOnly/Hidden attributes to allow moving.
 
-.PARAMETER Verbose
-    If true, shows move logs (only relevant when testmode=false).
-
-.PARAMETER ShowProgress
-    If true, shows progress bars.
-
-.PARAMETER Force
-    If true, forces overwriting existing test structure (only relevant in testmode).
 #>
 
 [CmdletBinding()]
