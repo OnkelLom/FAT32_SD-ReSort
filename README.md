@@ -40,7 +40,7 @@ Basic usage of the script:
 ### Parameters
 - `-Path` (optional): Root path to sort. Defaults to the script folder if not specified.
 - `-SortBy` (optional): Sorting criteria. Options: `Name`, `CreationTime`, `LastWriteTime`, `Length`. Default is `Name`.
-- `-DryRun` (switch, optional): Simulates actions without moving any files.
+- `-DryRun` (switch, optional): Simulates actions without moving any files. 
 - `-HandleReadOnlyHidden` (switch, optional): Temporarily removes ReadOnly and Hidden attributes to allow moving. Default is `true`.
 
 ### Examples
