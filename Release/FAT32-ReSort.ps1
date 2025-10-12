@@ -31,9 +31,6 @@ param(
     [bool]$HandleReadOnlyHidden = $true                     # If set, temporarily removes ReadOnly/Hidden attributes to allow moving
 )
 try {
-    #debug
-    $Path = "F:\"
-    #& C:\Users\lomped\Development\SD-FATResort\Development\New-SDTestStructure.ps1 -Path $Path
     #region Global Variables & Constants
 
     # Handle DryRun globally
