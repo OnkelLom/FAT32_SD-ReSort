@@ -20,17 +20,18 @@ param(
 )
 
 #region Variables
+# debug
 
 $Folders = @(
-    @{ Name="Test_NormalFolder";   Attributes="Normal" },
     @{ Name="Test_ReadOnlyFolder"; Attributes="ReadOnly" },
-    @{ Name="Test_HiddenFolder";   Attributes="Hidden" }
+    @{ Name="Test_HiddenFolder";   Attributes="Hidden" },
+    @{ Name="Test_NormalFolder";   Attributes="Normal" }
 )
 
 $FileTypes = @(
-    @{ Suffix="NormalFile.txt";   Content="Normal test file"; Attributes="Normal" },
     @{ Suffix="ReadOnlyFile.txt"; Content="ReadOnly test file"; Attributes="ReadOnly" },
-    @{ Suffix="HiddenFile.txt";   Content="Hidden test file"; Attributes="Hidden" }
+    @{ Suffix="HiddenFile.txt";   Content="Hidden test file"; Attributes="Hidden" },
+    @{ Suffix="NormalFile.txt";   Content="Normal test file"; Attributes="Normal" }
 )
 
 #endregion
@@ -65,7 +66,7 @@ function Convert-Attribute {
     }
 }
 
-function New-Folder {
+function New-TestFolder {
     param([string]$TargetPath)
     try {
         if (-not (Test-Path $TargetPath)) {
@@ -77,7 +78,7 @@ function New-Folder {
     }
 }
 
-function New-File {
+function New-TestFile {
     param([string]$TargetPath, [string]$Content)
     try {
         Set-Content -Path $TargetPath -Value $Content -ErrorAction Stop
@@ -165,7 +166,7 @@ if ([string]::IsNullOrWhiteSpace($Path)) {
 try {
     if ($RebuildTest -and (Test-Path $Path)) {
         Write-Log "Rebuild mode active: Removing existing test folder $Path" -Level "INFO"
-        Normalize-AttributesForDeletion -TargetPath $Path
+        Reset-AttributesForDeletion -TargetPath $Path
         Remove-Item $Path -Recurse -Force -ErrorAction Stop
     }
 
@@ -184,7 +185,7 @@ try {
 
 foreach ($folder in $Folders) {
     $fullPath = Join-Path $Path $folder.Name
-    Create-Folder -TargetPath $fullPath
+    New-TestFolder -TargetPath $fullPath
     Set-Attributes -TargetPath $fullPath -Attributes (Convert-Attribute $folder.Attributes)
 }
 
@@ -196,7 +197,7 @@ foreach ($folder in $Folders) {
     $parentFolder = Join-Path $Path $folder.Name
     foreach ($fileType in $FileTypes) {
         $fullPath = Join-Path $parentFolder $fileType.Suffix
-        Create-File -TargetPath $fullPath -Content $fileType.Content
+        New-TestFile -TargetPath $fullPath -Content $fileType.Content
         Set-Attributes -TargetPath $fullPath -Attributes (Convert-Attribute $fileType.Attributes)
     }
 }

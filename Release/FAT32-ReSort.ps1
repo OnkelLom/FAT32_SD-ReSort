@@ -30,199 +30,256 @@ param(
     [Switch]$DryRun,                                        # If set, only simulates moves and folder creation/removal
     [bool]$HandleReadOnlyHidden = $true                     # If set, temporarily removes ReadOnly/Hidden attributes to allow moving
 )
+try {
+    #debug
+    $Path = "F:\"
+    #& C:\Users\lomped\Development\SD-FATResort\Development\New-SDTestStructure.ps1 -Path $Path
+    #region Global Variables & Constants
 
-#region Global Variables & Constants
+    # Handle DryRun globally
+    $GlobalDryRun = $PSBoundParameters.ContainsKey('DryRun') -and $DryRun
 
-# Handle DryRun globally
-$GlobalDryRun = $PSBoundParameters.ContainsKey('DryRun') -and $DryRun
+    # Handle ReadOnly/Hidden globally
+    $GlobalHandleReadOnlyHidden = $HandleReadOnlyHidden
 
-# Handle ReadOnly/Hidden globally
-$GlobalHandleReadOnlyHidden = $HandleReadOnlyHidden
-
-# Exclusions - files or folders to exclude from sorting (e.g. the script itself)
-$Exclusions = @(
-    $MyInvocation.MyCommand.Source,
-    "System Volume Information"
-)
-
-#endregion
-
-#region Functions
-
-function Write-Log {
-    param(
-        [string]$Message,
-        [ValidateSet("INFO","PASS","FAIL","ERROR","WARN")]
-        [string]$Level = "INFO"
+    # Exclusions - files or folders to exclude from sorting (e.g. the script itself)
+    $Exclusions = @(
+        $MyInvocation.MyCommand.Source,
+        "System Volume Information"
     )
 
-    $color = switch ($Level) {
-        "INFO"  { "White" }
-        "PASS"  { "Green" }
-        "FAIL"  { "Red" }
-        "ERROR" { "Red" }
-        "WARN"  { "Yellow" }
-    }
+    #endregion
 
-    Write-Host "[$Level] $Message $(if($GlobalDryRun) { '(DryRun)' })" -ForegroundColor $color
-}
-function Move-ItemWithAttributes {
-    param(
-        [Parameter(Mandatory=$true)][System.IO.FileSystemInfo]$Item,
-        [Parameter(Mandatory=$true)][string]$Target
-    )
+    #region Functions
 
-    # Determine if item is file or folder   
-    $currentItemType = if ($Item.PSIsContainer) { 'Folder' } else { 'File' }
+    function Write-Log {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory)]
+            [string]$Message,
 
-    # check if ReadOnly or Hidden
-    [System.IO.FileAttributes]$originalAttributes = $Item.Attributes
-    $isSpecial = $Item.Attributes -band ([System.IO.FileAttributes]::ReadOnly -bor [System.IO.FileAttributes]::Hidden)
+            [ValidateSet("INFO", "PASS", "FAIL", "ERROR", "WARN")]
+            [string]$Level = "INFO",
 
-    if ($isSpecial) {
-        if ($GlobalHandleReadOnlyHidden) {
+            [string]$Action
+        )
 
-            # INFO, move with Attributes
-            Write-Log "[MOVE] $currentItemType (ReadOnly/Hidden) $($Item.FullName)" -Level "INFO"
-            
-        } else {
-            # WARN, no move
-            Write-Log "[WARN] $currentItemType has special attributes (ReadOnly/Hidden) and will NOT be moved: $($Item.FullName)" -Level "WARN"
-            return
+        # Determine output color based on log level
+        $color = switch ($Level) {
+            "INFO" { "White" }
+            "PASS" { "Green" }
+            "FAIL" { "Red" }
+            "ERROR" { "Red" }
+            "WARN" { "Yellow" }
+            default { "Gray" }
         }
-    } else {
-        Write-Log "[MOVE] $currentItemType $($Item.FullName)" -Level "INFO"
-    }
 
-    # Do if not DryRun
-    if (-not $GlobalDryRun) {
-        try {
-            if ($GlobalHandleReadOnlyHidden -and $isSpecial) {
-                # temporarily remove attributes
-                $Item.Attributes = [System.IO.FileAttributes]::Normal 
-            }
-
-            # do move
-            Move-Item $Item.FullName $Target -ErrorAction Stop
-
-            if ($GlobalHandleReadOnlyHidden -and $isSpecial) {
-                # restore attributes
-                (Get-Item $Target -Force).Attributes = $originalAttributes
-            }
-        } catch {
-            Write-Log "[ERROR] Failed to move item $($item.FullName): $($_.Exception.Message)" -Level "ERROR"
+        # Check if GlobalDryRun exists and is true
+        $isDryRun = $false
+        if (Get-Variable -Name GlobalDryRun -Scope Global -ErrorAction SilentlyContinue) {
+            $isDryRun = [bool]$Global:GlobalDryRun
         }
-    }
-}
 
-function New-TempFolderWithId {
-    param(
-        [string]$BasePath
-    )
-    try {
-        $uniqueId = ([guid]::NewGuid().ToString('N')).Substring(0,6)
-        $tempFolder = Join-Path $BasePath $uniqueId
-        Write-Log "[CREATE] Folder $tempFolder temporarily created" -Level "INFO"
+        # Optional DryRun prefix
+        $dryRunText = if ($isDryRun) { "[DryRun] " } else { "" }
+
+        # Fixed column widths for alignment
+        $levelWidth = 8     # Total width for the [LEVEL] column
+        $actionWidth = 16    # Total width for the [ACTION] column
+
+        # Format level and action fields to align messages consistently
+        $levelText = ("[{0}]" -f $Level).PadRight($levelWidth)
+        $actionText = if (-not [string]::IsNullOrWhiteSpace($Action)) {
+            ("[{0}]" -f $Action).PadRight($actionWidth)
+        }
+        else {
+            "".PadRight($actionWidth)
+        }
+
+        # Build final output line
+        $output = "$dryRunText$levelText$actionText$Message"
+
+        # Print colored log line to console
+        Write-Host $output -ForegroundColor $color
+    }
+
+    function Move-ItemWithAttributes {
+        param(
+            [Parameter(Mandatory = $true)][System.IO.FileSystemInfo]$Item,
+            [Parameter(Mandatory = $true)][string]$Target
+        )
+
+        # Determine if item is file or folder   
+        $currentItemType = if ($Item.PSIsContainer) { 'Folder' } else { 'File' }
+
+        # check if ReadOnly or Hidden
+        [System.IO.FileAttributes]$originalAttributes = $Item.Attributes
+        $isSpecial = $Item.Attributes -band ([System.IO.FileAttributes]::ReadOnly -bor [System.IO.FileAttributes]::Hidden)
+
+        if ($isSpecial) {
+            if ($GlobalHandleReadOnlyHidden) {
+
+                # INFO, move with Attributes
+                Write-Log "$currentItemType (ReadOnly/Hidden) $($Item.FullName)" -Level "INFO" -Action "MOVE"
+                
+            }
+            else {
+                # WARN, no move
+                Write-Log "$currentItemType has special attributes (ReadOnly/Hidden) and will NOT be moved: $($Item.FullName)" -Level "WARN" -Action $null
+                return
+            }
+        }
+        else {
+            Write-Log "$currentItemType $($Item.FullName)" -Level "INFO" -Action "MOVE"
+        }
+
+        # Do if not DryRun
         if (-not $GlobalDryRun) {
-            New-Item -Path $tempFolder -ItemType Directory -Force | Out-Null
-        }  
-        return $tempFolder
-    }
-    catch {
-        Write-Log "[ERROR] Failed to create temp folder in $BasePath : $($_.Exception.Message)" -Level "ERROR"
-    }
-}
+            try {
+                if ($GlobalHandleReadOnlyHidden -and $isSpecial) {
+                    # temporarily remove attributes
+                    $Item.Attributes = [System.IO.FileAttributes]::Normal 
+                }
 
-#endregion
+                # do move
+                Move-Item $Item.FullName $Target -ErrorAction Stop
 
-#region Check & Set Root Path
-
-if ([string]::IsNullOrWhiteSpace($Path)) {
-    $Path = Split-Path -Parent $MyInvocation.MyCommand.Definition
-    Write-Log "No path provided. Using script folder as root: $Path" -Level "INFO"
-} else {
-    Write-Log "Using provided path as root: $Path" -Level "INFO"
-}
-
-#endregion
-
-#region FAT32 ReSort Logic
-
-# Initialize runtime variables
-$folders          = @()
-
-# Collect all folders recursively (exclude temp folder)
-$folders = Get-ChildItem -Path $Path -Directory -Recurse -Force | Where-Object {
-    ($Exclusions -notcontains $_.FullName) -and
-    ($Exclusions -notcontains $_.Name)
-} | Sort-Object FullName
-
-# Process each folder
-$totalFolders = $folders.Count
-$folderIndex = 0
-$lastPercent = -1
-
-foreach ($folder in $folders) {
-    $folderIndex++
-    $percent = [math]::Floor(($folderIndex / $totalFolders) * 100)
-    if ($percent -ne $lastPercent) {
-        Write-Progress -Activity "FAT32 Resort" -Status "Ordner $folderIndex von $totalFolders" -PercentComplete $percent -CurrentOperation "Processing folder: $($folder.FullName)"
-        $lastPercent = $percent
+                if ($GlobalHandleReadOnlyHidden -and $isSpecial) {
+                    # restore attributes
+                    (Get-Item $Target -Force).Attributes = $originalAttributes
+                }
+            }
+            catch {
+                Write-Log "Failed to move item $($item.FullName): $($_.Exception.Message)" -Level "ERROR" -Action "ABORT"
+                throw 
+            }
+        }
     }
 
-    Write-Log "[INFO] Processing folder: $($folder.FullName)" -Level "INFO"
+    function New-TempFolderWithId {
+        param(
+            [string]$BasePath
+        )
+        try {
+            $uniqueId = "temp_" + ([guid]::NewGuid().ToString('N')).Substring(0, 4)
+            $tempFolder = Join-Path $BasePath $uniqueId
+            Write-Log "Folder $tempFolder temporarily created" -Level "INFO" -Action "CREATE"
+            if (-not $GlobalDryRun) {
+                New-Item -Path $tempFolder -ItemType Directory -Force | Out-Null
+            }  
+            return $tempFolder
+        }
+        catch {
+            Write-Log "Failed to create temp folder in $BasePath : $($_.Exception.Message)" -Level "ERROR" -Action $null
+        }
+    }
 
-    # Collect all items in the folder, sort by chosen criteria
-    $allItems  = Get-ChildItem -Path $folder.FullName -Force | Where-Object {
+    #endregion
+
+    #region Check & Set Root Path
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        $Path = Split-Path -Parent $MyInvocation.MyCommand.Definition
+        Write-Log "No path provided. Using script folder as root: $Path" -Level "INFO" -Action $null
+    }
+    else {
+        Write-Log "Using provided path as root: $Path" -Level "INFO" -Action $null
+    }
+
+    #endregion
+
+    #region FAT32 ReSort Logic
+
+    # Initialize runtime variables
+    $folders = @()
+
+    # Collect all folders recursively (exclude temp folder)
+    $folders = Get-ChildItem -Path $Path -Directory -Recurse -Force | Where-Object {
         ($Exclusions -notcontains $_.FullName) -and
         ($Exclusions -notcontains $_.Name)
-    } | Sort-Object $SortBy
-    $totalItems = $allItems.Count
+    } | Sort-Object FullName
 
-    # Skip if no items to sort
-    if ($totalItems -eq 0) {
-        Write-Log "Nothing to sort in $($folder.FullName), skipping." -Level "INFO"
-        continue
-    }
+    # Process each folder
+    $totalFolders = $folders.Count
+    $folderIndex = 0
+    $lastPercent = -1
 
-    # Create temporary folder
-    try {
-        $currenttempfolder = New-TempFolderWithId -BasePath $folder.FullName
-    } catch {
-        Write-Log "[ERROR] Failed to create temp folder $currenttempfolder : $($_.Exception.Message)" -Level "ERROR"
-        continue
-    }
+    foreach ($loopfolder in $folders) {
+        $folderIndex++
+        $percent = [math]::Floor(($folderIndex / $totalFolders) * 100)
+        if ($percent -ne ($lastPercent + 2)) {
+            Write-Progress -Activity "FAT32 Resort" -Status "Ordner $folderIndex von $totalFolders" -PercentComplete $percent -CurrentOperation "Processing folder: $($loopfolder.FullName)"
+            $lastPercent = $percent
+        }
 
-    # Move each item into temp folder
-    foreach ($item in $allItems) {
-        $dest = Join-Path $currenttempfolder $item.Name
-        Move-ItemWithAttributes -Item $item -Target $dest
-    }
+        Write-Log "Processing folder: $($loopfolder.FullName)" -Level "INFO" -Action "CHANGEFOLDER"
 
-    # Move items back from temp folder to original folder in sorted order
-    if (-not $GlobalDryRun) {
-        Write-Log "[INFO] All items moved to $currenttempfolder - Start Sorting" -Level "INFO"
-        $sortedItems = Get-ChildItem -Path $currenttempfolder -Force | Sort-Object $SortBy
-        foreach ($item in $sortedItems) {
-            $dest = Join-Path $folder.FullName $item.Name
+        # Collect all items in the folder
+        $allItems = Get-ChildItem -Path $loopfolder.FullName -Force | Where-Object {
+            ($Exclusions -notcontains $_.FullName) -and
+            ($Exclusions -notcontains $_.Name)
+        } #| Sort-Object $SortBy
+
+        # Skip if no items to sort
+        if ($allItems.Count -eq 0) {
+            Write-Log "Nothing to sort in $($loopfolder.FullName), skipping." -Level "INFO" -Action $null
+            continue
+        }
+
+        # Create temporary folder
+        try {
+            $currenttempfolder = New-TempFolderWithId -BasePath $loopfolder.FullName
+        }
+        catch {
+            Write-Log "Failed to create temp folder $currenttempfolder : $($_.Exception.Message)" -Level "ERROR" -Action "ABORT"
+            continue
+        }
+
+        # Move each item into temp folder
+        foreach ($item in $allItems) {
+            $dest = Join-Path $currenttempfolder $item.Name
             Move-ItemWithAttributes -Item $item -Target $dest
         }
-    } else {
-        Write-Log "[INFO] Would sort and move items back from $currenttempfolder" -Level "INFO"
-    }
 
-    # Remove temporary folder
-    try {
+        # Move items back from temp folder to original folder in sorted order
         if (-not $GlobalDryRun) {
-            Remove-Item $currenttempfolder -Force -ErrorAction Stop
+            Write-Log "All items moved to $currenttempfolder - Start Sorting" -Level "INFO" -Action "STARTSORT"
+            $sortedFolders = Get-ChildItem -Path $currenttempfolder -Force -Directory  | Sort-Object $SortBy
+            $sortedFiles = Get-ChildItem -Path $currenttempfolder -Force -File  | Sort-Object $SortBy
+            if ($sortedFolders.Count -ne 0) {
+                foreach ($currentFolder in $sortedFolders) {
+                    $dest = Join-Path $loopfolder.FullName $currentFolder.Name
+                    Write-Log "Moving Folder $($currentFolder.FullName)" -Level "INFO" -Action "SORT"
+                    Move-ItemWithAttributes -Item $currentFolder -Target $dest
+                }
+            }
+            if ($sortedFiles.Count -ne 0) {
+                foreach ($currentFile in $sortedFiles) {
+                    $dest = Join-Path $loopfolder.FullName $currentFile.Name
+                    Move-ItemWithAttributes -Item $currentFile -Target $dest
+                }
+            }
         }
-        Write-Log "[REMOVE] Folder $currenttempfolder removed" -Level "INFO"
-    } catch {
-        Write-Log "[ERROR] Failed to remove temp folder $currenttempfolder : $($_.Exception.Message)" -Level "ERROR"
-    }
-    }
-Write-Progress -Activity "FAT32 Resort" -Completed
+        else {
+            Write-Log "Would sort and move items back from $currenttempfolder" -Level "INFO" -Action "SORT"
+        }
 
-#endregion
+        # Remove temporary folder
+        try {
+            if (-not $GlobalDryRun) {
+                Remove-Item $currenttempfolder -Force -ErrorAction Stop
+            }
+            Write-Log "Folder $currenttempfolder removed" -Level "INFO" -Action "REMOVETEMP"
+        }
+        catch {
+            Write-Log "Failed to remove temp folder $currenttempfolder : $($_.Exception.Message)" -Level "ERROR" -Action "ABORT"
+        }
+    }
+    Write-Progress -Activity "FAT32 Resort" -Completed
 
-Write-Log "[SUCCESS] Script completed successfully" -Level "INFO"
+    #endregion
+
+    Write-Log "Script completed successfully" -Level "INFO" -Action "PASS"
+}
+catch { 
+}
