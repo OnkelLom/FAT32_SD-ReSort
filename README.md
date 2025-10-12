@@ -3,6 +3,8 @@
 ## Description
 This PowerShell script performs a FAT/FAT32-style re-sorting of folders and files, which is especially useful for SD cards using FAT/FAT32 file systems. Some devices, such as EverDrive GB x7 or EverDrive N8 flashcarts, cannot automatically sort files and folders. This script helps achieve the desired order by moving Files and Folders to temporary folders and back.
 
+This Script does NOT work LowLevel at the file allocation table and should be completely safe. Nevertheless: Backup your data before using this! 
+
 **Note:** An additional script is provided to create a test folder structure with various file and folder attributes (Normal, ReadOnly, Hidden) for development and testing purposes. This test script should only be used in a development environment to create a teststructure and is not needed for functionality of the main-script.
 
 ## Features
